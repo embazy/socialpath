@@ -1,37 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Peer-to-Peer Chat</title>
+  <title>Auto P2P Chat</title>
 </head>
 <body>
-<h1>WebRTC Peer-to-Peer ChatPAGE</h1>
+<h1>Peer-to-Peer Chat (Automatic Signaling)</h1>
 
 <textarea id="log" rows="10" cols="50" readonly></textarea><br>
-
 <input id="message" placeholder="Type message..." />
 <button onclick="sendMessage()">Send</button>
-<br><br>
-
-<h3>Signaling</h3>
-<p>Step 1: Copy your offer below and share with peer:</p>
-<textarea id="localSDP" rows="6" cols="50"></textarea>
-<br>
-<p>Step 2: Paste peer's answer below and press "Connect":</p>
-<textarea id="remoteSDP" rows="6" cols="50"></textarea>
-<br>
-<button onclick="connectPeer()">Connect</button>
 
 <script>
 let pc = new RTCPeerConnection();
 let channel = pc.createDataChannel("chat");
+let ws = new WebSocket("wss://echo.websocket.events"); // Public signaling server
 
-// Display received messages
+// Display messages
 channel.onmessage = (e) => {
     const log = document.getElementById('log');
     log.value += 'Peer: ' + e.data + '\n';
 };
 
-// Send messages
 function sendMessage() {
     const input = document.getElementById('message');
     channel.send(input.value);
@@ -40,30 +29,37 @@ function sendMessage() {
     input.value = '';
 }
 
-// ICE candidates
+// ICE candidates (we’ll just signal local description when ready)
 pc.onicecandidate = (event) => {
     if (event.candidate) return;
-    document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
+    ws.send(JSON.stringify(pc.localDescription));
 };
 
-// Step 1: create offer
-async function createOffer() {
+// Receive signaling messages
+ws.onmessage = async (event) => {
+    try {
+        const msg = JSON.parse(event.data);
+        if (!msg.type) return;
+        if (msg.type === 'offer') {
+            await pc.setRemoteDescription(msg);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(JSON.stringify(pc.localDescription));
+        } else if (msg.type === 'answer') {
+            await pc.setRemoteDescription(msg);
+        }
+    } catch (err) {
+        console.log("Received non-SDP message or error", err);
+    }
+};
+
+// Create initial offer
+async function initConnection() {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
+    ws.send(JSON.stringify(pc.localDescription));
 }
-createOffer();
-
-// Step 2: connect peer by pasting their SDP
-async function connectPeer() {
-    const remoteSDP = JSON.parse(document.getElementById('remoteSDP').value);
-    await pc.setRemoteDescription(remoteSDP);
-    if (remoteSDP.type === 'offer') {
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
-    }
-}
+initConnection();
 </script>
 </body>
 </html>
-
