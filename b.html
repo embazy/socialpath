@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Auto P2P Chat</title>
+</head>
+<body>
+<h1>Peer-to-Peer Chat (Automatic Signaling)</h1>
+
+<textarea id="log" rows="10" cols="50" readonly></textarea><br>
+<input id="message" placeholder="Type message..." />
+<button onclick="sendMessage()">Send</button>
+
+<script>
+let pc = new RTCPeerConnection();
+let channel = pc.createDataChannel("chat");
+let ws = new WebSocket("wss://echo.websocket.events"); // Public signaling server
+
+// Display messages
+channel.onmessage = (e) => {
+    const log = document.getElementById('log');
+    log.value += 'Peer: ' + e.data + '\n';
+};
+
+function sendMessage() {
+    const input = document.getElementById('message');
+    channel.send(input.value);
+    const log = document.getElementById('log');
+    log.value += 'You: ' + input.value + '\n';
+    input.value = '';
+}
+
+// ICE candidates (we’ll just signal local description when ready)
+pc.onicecandidate = (event) => {
+    if (event.candidate) return;
+    ws.send(JSON.stringify(pc.localDescription));
+};
+
+// Receive signaling messages
+ws.onmessage = async (event) => {
+    try {
+        const msg = JSON.parse(event.data);
+        if (!msg.type) return;
+        if (msg.type === 'offer') {
+            await pc.setRemoteDescription(msg);
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            ws.send(JSON.stringify(pc.localDescription));
+        } else if (msg.type === 'answer') {
+            await pc.setRemoteDescription(msg);
+        }
+    } catch (err) {
+        console.log("Received non-SDP message or error", err);
+    }
+};
+
+// Create initial offer
+async function initConnection() {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    ws.send(JSON.stringify(pc.localDescription));
+}
+initConnection();
+</script>
+</body>
+</html>
