@@ -1,68 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Peer-to-Peer Chat</title>
+  <title>Chat Demo</title>
 </head>
 <body>
-<h1>WebRTC Peer-to-Peer Chat</h1>
+  <h1>Chat</h1>
+  <div id="chat"></div>
+  <input id="msg" placeholder="Type a message..."/>
+  <button onclick="sendMessage()">Send</button>
 
-<textarea id="log" rows="10" cols="50" readonly></textarea><br>
+  <script>
+    // Using a public echo server
+    const ws = new WebSocket('wss://echo.websocket.events');
 
-<input id="message" placeholder="Type message..." />
-<button onclick="sendMessage()">Send</button>
-<br><br>
+    ws.onopen = () => console.log('Connected!');
+    ws.onmessage = (event) => {
+        const chat = document.getElementById('chat');
+        chat.innerHTML += '<p>' + event.data + '</p>';
+    };
 
-<h3>Signaling</h3>
-<p>Step 1: Copy your offer below and share with peer:</p>
-<textarea id="localSDP" rows="6" cols="50"></textarea>
-<br>
-<p>Step 2: Paste peer's answer below and press "Connect":</p>
-<textarea id="remoteSDP" rows="6" cols="50"></textarea>
-<br>
-<button onclick="connectPeer()">Connect</button>
-
-<script>
-let pc = new RTCPeerConnection();
-let channel = pc.createDataChannel("chat");
-
-// Display received messages
-channel.onmessage = (e) => {
-    const log = document.getElementById('log');
-    log.value += 'Peer: ' + e.data + '\n';
-};
-
-// Send messages
-function sendMessage() {
-    const input = document.getElementById('message');
-    channel.send(input.value);
-    const log = document.getElementById('log');
-    log.value += 'You: ' + input.value + '\n';
-    input.value = '';
-}
-
-// ICE candidates
-pc.onicecandidate = (event) => {
-    if (event.candidate) return;
-    document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
-};
-
-// Step 1: create offer
-async function createOffer() {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-}
-createOffer();
-
-// Step 2: connect peer by pasting their SDP
-async function connectPeer() {
-    const remoteSDP = JSON.parse(document.getElementById('remoteSDP').value);
-    await pc.setRemoteDescription(remoteSDP);
-    if (remoteSDP.type === 'offer') {
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        document.getElementById('localSDP').value = JSON.stringify(pc.localDescription);
+    function sendMessage() {
+        const input = document.getElementById('msg');
+        ws.send(input.value);
+        input.value = '';
     }
-}
-</script>
+  </script>
 </body>
 </html>
