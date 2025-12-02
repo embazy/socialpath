@@ -15,14 +15,19 @@
 <div>
   <label>Your Name: <input type="text" id="username" placeholder="Enter name"></label>
 </div>
+<p>Connected users: <span id="userCount">0</span></p>
+
 <input type="text" id="messageInput" placeholder="Type a message">
 <button onclick="sendMessage()">Send</button>
 <ul id="messages"></ul>
 
 <script>
 const STORAGE_KEY = 'party_chat_history';
+const HEARTBEAT_KEY = 'chat_heartbeats';
+const HEARTBEAT_INTERVAL = 1000; // 1 second
 const channel = new BroadcastChannel('chat_channel');
 const messagesEl = document.getElementById('messages');
+const userCountEl = document.getElementById('userCount');
 
 // Ask user for a name
 let username = localStorage.getItem('chat_username') || '';
@@ -42,14 +47,19 @@ document.getElementById('username').addEventListener('change', (e) => {
 let chatHistory = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
 chatHistory.forEach(msg => addMessage(msg));
 
-// Listen for messages from other tabs
+// BroadcastChannel message listener
 channel.onmessage = (event) => {
     const msg = event.data;
-    addMessage(msg);
-    chatHistory.push(msg);
-    saveHistory();
+    if (msg.type === 'chat') {
+        addMessage(msg.text);
+        chatHistory.push(msg.text);
+        saveHistory();
+    } else if (msg.type === 'heartbeat') {
+        updateHeartbeats(msg.id, msg.timestamp);
+    }
 };
 
+// Send chat message
 function sendMessage() {
     const input = document.getElementById('messageInput');
     if (!input.value) return;
@@ -59,11 +69,12 @@ function sendMessage() {
     chatHistory.push(msg);
     saveHistory();
 
-    // Broadcast to other tabs
-    channel.postMessage(msg);
+    // Broadcast chat message
+    channel.postMessage({ type: 'chat', text: msg });
     input.value = '';
 }
 
+// Add message to UI
 function addMessage(msg) {
     const li = document.createElement('li');
     li.textContent = msg;
@@ -71,9 +82,49 @@ function addMessage(msg) {
     messagesEl.scrollTop = messagesEl.scrollHeight;
 }
 
+// Save chat history
 function saveHistory() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory));
 }
+
+// Heartbeat system for counting tabs
+const tabId = Date.now() + Math.random();
+let heartbeats = JSON.parse(localStorage.getItem(HEARTBEAT_KEY)) || {};
+
+function sendHeartbeat() {
+    const timestamp = Date.now();
+    heartbeats[tabId] = timestamp;
+    localStorage.setItem(HEARTBEAT_KEY, JSON.stringify(heartbeats));
+    channel.postMessage({ type: 'heartbeat', id: tabId, timestamp });
+    cleanHeartbeats();
+    updateUserCount();
+}
+
+function updateHeartbeats(id, timestamp) {
+    heartbeats[id] = timestamp;
+    localStorage.setItem(HEARTBEAT_KEY, JSON.stringify(heartbeats));
+    updateUserCount();
+}
+
+function cleanHeartbeats() {
+    const now = Date.now();
+    for (const id in heartbeats) {
+        if (now - heartbeats[id] > HEARTBEAT_INTERVAL * 3) {
+            delete heartbeats[id]; // remove inactive tabs
+        }
+    }
+    localStorage.setItem(HEARTBEAT_KEY, JSON.stringify(heartbeats));
+}
+
+// Update connected user count in UI
+function updateUserCount() {
+    const count = Object.keys(heartbeats).length;
+    userCountEl.textContent = count;
+}
+
+// Send heartbeat periodically
+setInterval(sendHeartbeat, HEARTBEAT_INTERVAL);
+sendHeartbeat(); // initial
 </script>
 </body>
 </html>
