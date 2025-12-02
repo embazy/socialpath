@@ -2,30 +2,77 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>BroadcastChannel Chat</title>
+<title>Party Chat - BroadcastChannel</title>
+<style>
+  body { font-family: sans-serif; }
+  #messages { list-style: none; padding: 0; max-height: 300px; overflow-y: auto; }
+  #messages li { margin: 5px 0; }
+</style>
 </head>
 <body>
-<h1>Local Tab Chat</h1>
+<h1>Party Chat</h1>
+
+<div>
+  <label>Your Name: <input type="text" id="username" placeholder="Enter name"></label>
+</div>
 <input type="text" id="messageInput" placeholder="Type a message">
 <button onclick="sendMessage()">Send</button>
 <ul id="messages"></ul>
 
 <script>
+const STORAGE_KEY = 'party_chat_history';
 const channel = new BroadcastChannel('chat_channel');
+const messagesEl = document.getElementById('messages');
 
-channel.onmessage = (event) => addMessage(`Other: ${event.data}`);
+// Ask user for a name
+let username = localStorage.getItem('chat_username') || '';
+if (!username) {
+    username = prompt("Enter your name") || "Anonymous";
+    localStorage.setItem('chat_username', username);
+}
+document.getElementById('username').value = username;
+
+// Update username if changed
+document.getElementById('username').addEventListener('change', (e) => {
+    username = e.target.value || 'Anonymous';
+    localStorage.setItem('chat_username', username);
+});
+
+// Load old messages
+let chatHistory = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+chatHistory.forEach(msg => addMessage(msg));
+
+// Listen for messages from other tabs
+channel.onmessage = (event) => {
+    const msg = event.data;
+    addMessage(msg);
+    chatHistory.push(msg);
+    saveHistory();
+};
 
 function sendMessage() {
     const input = document.getElementById('messageInput');
-    addMessage(`You: ${input.value}`);
-    channel.postMessage(input.value);
+    if (!input.value) return;
+
+    const msg = `${username}: ${input.value}`;
+    addMessage(msg);
+    chatHistory.push(msg);
+    saveHistory();
+
+    // Broadcast to other tabs
+    channel.postMessage(msg);
     input.value = '';
 }
 
 function addMessage(msg) {
     const li = document.createElement('li');
     li.textContent = msg;
-    document.getElementById('messages').appendChild(li);
+    messagesEl.appendChild(li);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function saveHistory() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chatHistory));
 }
 </script>
 </body>
