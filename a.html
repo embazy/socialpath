@@ -1,29 +1,32 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Chat Demo</title>
+<meta charset="UTF-8">
+<title>BroadcastChannel Chat</title>
 </head>
 <body>
-  <h1>Chat</h1>
-  <div id="chat"></div>
-  <input id="msg" placeholder="Type a message..."/>
-  <button onclick="sendMessage()">Send</button>
+<h1>Local Tab Chat</h1>
+<input type="text" id="messageInput" placeholder="Type a message">
+<button onclick="sendMessage()">Send</button>
+<ul id="messages"></ul>
 
-  <script>
-    // Using a public echo server
-    const ws = new WebSocket('wss://echo.websocket.events');
+<script>
+const channel = new BroadcastChannel('chat_channel');
 
-    ws.onopen = () => console.log('Connected!');
-    ws.onmessage = (event) => {
-        const chat = document.getElementById('chat');
-        chat.innerHTML += '<p>' + event.data + '</p>';
-    };
+channel.onmessage = (event) => addMessage(`Other: ${event.data}`);
 
-    function sendMessage() {
-        const input = document.getElementById('msg');
-        ws.send(input.value);
-        input.value = '';
-    }
-  </script>
+function sendMessage() {
+    const input = document.getElementById('messageInput');
+    addMessage(`You: ${input.value}`);
+    channel.postMessage(input.value);
+    input.value = '';
+}
+
+function addMessage(msg) {
+    const li = document.createElement('li');
+    li.textContent = msg;
+    document.getElementById('messages').appendChild(li);
+}
+</script>
 </body>
 </html>
