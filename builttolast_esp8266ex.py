@@ -2320,11 +2320,17 @@ def verify_placement(placed, led, solenoid_row_band):
                         "F.Cu" if item_a["side"] == "F" else "B.Cu"
                     )
                 raise RuntimeError(
-                    "{}: {} / {}. Components on opposite sides must not "
-                    "overlap through the PCB.".format(
+                    "{}: {} / {}. Measured bounds {} = {}; {} = {}; "
+                    "applied clearances {:.2f} mm / {:.2f} mm.".format(
                         collision_type,
                         item_a["reference"],
-                        item_b["reference"]
+                        item_b["reference"],
+                        item_a["reference"],
+                        tuple(round(to_mm(v), 2) for v in rect_a),
+                        item_b["reference"],
+                        tuple(round(to_mm(v), 2) for v in rect_b),
+                        clearance_a,
+                        clearance_b
                     )
                 )
 
