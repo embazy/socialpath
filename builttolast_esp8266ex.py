@@ -23,11 +23,11 @@
 #   - R3-R9 and R21-R24 are assigned to B.Cu to reduce ESP signal vias.
 #   - A full-width horizontal placement lane around solenoid connector J2 is
 #     reserved so no other component shares its row.
-#   - ESP8266EX onboard antenna is used directly; no external U.FL connector or host-board meander.
+#   - Bare ESP8266EX QFN32, external W25Q32 flash and 26 MHz crystal.
 #   - Placement audit checks component body/courtyard overlap on both PCB sides.
 #   - No M2 mounting-hole NPTH footprints are generated.
 #   - No dedicated programming header is fitted; ESP UART pads remain available.
-#   - Espressif ESP8266EX module is placed at the lower-right with its onboard antenna at the board edge.
+#   - ESP8266EX QFN32 is placed at the lower-right with a host PCB antenna at the right edge.
 #   - USB-C J1 fixed at lower-left, mirrored, receptacle opening facing the left edge.
 #   - FreeRouting width set to 0.20 mm; edge routing margin reserved on both layers.
 #   - Central WS2812B-V6 3.3 V RGB LED position fixed.
@@ -48,7 +48,7 @@
 #     ESP8266EX 3V3 rail is isolated from the 3.0 V solenoid pulse rail.
 #
 # Electrical:
-#   - ESP8266EX EN (pad 3) and VCC (pad 8) -> 3V3.
+#   - ESP8266EX CHIP_EN (pad 7) and supply pins are connected to 3V3.
 #   - D3 WS2812B-V6 powered from 3V3; ESP data connects directly.
 #   - Obsolete 5 V LED boost and AHCT level-shifter stages removed.
 #   - DW01A OD -> FS8205A G1 pad 4.
@@ -129,7 +129,7 @@ TPS63070_ADJACENT_PAD_CLEARANCE = 0.14
 
 BOARD_MARGIN = 1.0
 COMPONENT_CLEARANCE = 0.65  # More breathing room between component envelopes
-# Extra 2 mm body-to-body exclusion around the ESP8266EX Wi-Fi module. This is in
+# Extra 2 mm body-to-body exclusion around the ESP8266EX QFN32 and RF support area. This is in
 # addition to the ordinary component clearance and applies to BOTH sides.
 ESP_CLEARANCE = 2.0  # General clearance from other component envelopes
 # USB-C is fixed at the lower-left edge, mirrored so its receptacle faces
@@ -154,8 +154,8 @@ LED_CENTRE_Y = PCB_HEIGHT / 2
 PACKING_ATTEMPTS = 80  # Alternate orders retained as a collision-safe fallback
 RANDOM_SEED = 4217
 
-# ESP8266EX uses its onboard antenna. The old U.FL connector, host-board
-# meander and oversized external-antenna rule areas are intentionally removed.
+# ESP8266EX is a bare QFN32 device. External SPI flash, 26 MHz crystal,
+# RES12K resistor and a right-edge host PCB antenna are fitted.
 
 
 # Mounting-hole NPTH footprints and their keepouts have been removed.
@@ -1180,30 +1180,12 @@ def footprint_placement_bounds(footprint):
 # ================================================================
 
 
-def convert_esp12e_footprint_to_esp12f(footprint):
-    """Convert KiCad's 22-pad ESP-07 outline to the 16-pad ESP8266EX pinout.
-
-    The ESP8266EX keeps the same module outline and side castellations but does
-    not expose the six internal-flash contacts along the bottom edge.
-    """
-    pads = footprint_pad_items(footprint)
-    seen = set()
-    for pad in pads:
-        number = str(pad.GetNumber())
-        if number in {str(n) for n in range(9, 15)}:
-            footprint.Remove(pad)
-        elif number.isdigit() and 15 <= int(number) <= 22:
-            new_number = str(int(number) - 6)
-            pad.SetNumber(new_number)
-            seen.add(new_number)
-    required = {str(n) for n in range(1, 17)}
-    present = {str(p.GetNumber()) for p in footprint_pad_items(footprint)}
-    if present != required:
-        raise RuntimeError(
-            "ESP8266EX footprint conversion failed; expected pads 1-16, got {}".format(
-                sorted(present)
-            )
-        )
+def validate_esp8266ex_qfn32(footprint):
+    """Validate the actual bare ESP8266EX QFN32 pad numbering."""
+    actual = {str(p.GetNumber()) for p in footprint_pad_items(footprint)}
+    expected = {str(n) for n in range(1, 34)}
+    if actual != expected:
+        raise RuntimeError("ESP8266EX QFN32 must expose pads 1-33; got {}".format(sorted(actual)))
     return footprint
 
 def prepare_component(data):
@@ -1230,10 +1212,7 @@ def prepare_component(data):
 
     if ref == "U1":
         footprint.SetOrientationDegrees(0)
-        expected = {str(n) for n in range(1, 34)}
-        actual = {str(pad.GetNumber()) for pad in footprint_pad_items(footprint)}
-        if actual != expected:
-            raise RuntimeError("ESP8266EX QFN32 footprint must expose pads 1-33; got {}".format(sorted(actual)))
+        validate_esp8266ex_qfn32(footprint)
         footprint.SetOrientationDegrees(rotation)
 
     print("Preparing {}: base properties set".format(ref), flush=True)
@@ -1811,120 +1790,110 @@ def place_by_bounds(item, target_x, target_y):
     )
 
 
-def place_fixed_esp(board, nets, esp, report, audit_errors, fixed_obstacles=None):
-    """Place ESP8266EX vertically at the right edge using final transformed bounds."""
-    esp["side"] = "B"
-    footprint = esp["footprint"]
+def _flip_footprint_to_back(board, footprint, reference):
+    footprint.SetLayer(pcbnew.F_Cu)
+    footprint.SetPosition(point(0, 0))
     board.Add(footprint)
+    flip = getattr(footprint, "SetLayerAndFlip", None)
+    if callable(flip):
+        flip(pcbnew.B_Cu)
+    else:
+        direction = getattr(pcbnew, "FLIP_DIRECTION_LEFT_RIGHT", None)
+        if direction is None:
+            raise RuntimeError("KiCad has no supported B.Cu flip API for " + reference)
+        footprint.Flip(point(0, 0), direction)
+        footprint.SetLayer(pcbnew.B_Cu)
+    if footprint.GetLayer() != pcbnew.B_Cu:
+        raise RuntimeError("Could not flip {} to B.Cu".format(reference))
 
-    flip_method = getattr(footprint, "SetLayerAndFlip", None)
-    flip_direction = getattr(pcbnew, "FLIP_DIRECTION_LEFT_RIGHT", None)
 
-    obstacles = [
-        (obstacle["reference"], footprint_placement_bounds(obstacle["footprint"]))
-        for obstacle in (fixed_obstacles or [])
-    ]
-
-    def configure_back_orientation(angle):
-        # Always start from the same front-side state before mirroring. This
-        # avoids accumulating rotations/flips when trying both orientations.
-        footprint.SetLayer(pcbnew.F_Cu)
-        footprint.SetOrientationDegrees(0)
-        footprint.SetPosition(point(0, 0))
-        if callable(flip_method):
-            flip_method(pcbnew.B_Cu)
-        else:
-            if flip_direction is None:
-                raise RuntimeError("KiCad pcbnew has no supported footprint flip API for U1")
-            footprint.Flip(point(0, 0), flip_direction)
-            footprint.SetLayer(pcbnew.B_Cu)
-        if footprint.GetLayer() != pcbnew.B_Cu:
-            raise RuntimeError("ESP8266EX U1 could not be placed on B.Cu")
-        footprint.SetOrientationDegrees(angle)
-        footprint.SetPosition(point(0, 0))
-        return footprint_placement_bounds(footprint)
-
-    candidates = []
-    step = max(1, mm(PLACEMENT_GRID_STEP))
-    for angle in (90, 270):
-        initial = configure_back_orientation(angle)
-        width, height = rectangle_dimensions(initial)
-        target_left = mm(PCB_WIDTH - 8.0) - width
-        target_x = int(target_left - initial[0])
-        min_top = mm(BOARD_MARGIN)
-        max_top = mm(PCB_HEIGHT - BOARD_MARGIN) - height
-        y = max_top
-        while y >= min_top:
-            target_y = int(y - initial[1])
-            footprint.SetPosition(pcbnew.VECTOR2I(target_x, target_y))
-            bounds = footprint_placement_bounds(footprint)
-            if rectangle_inside_board(bounds):
-                expanded = expand_rectangle(bounds, ESP_CLEARANCE)
-                if not any(rectangle_overlap(
-                    expanded, expand_rectangle(rect, COMPONENT_CLEARANCE / 2.0)
-                ) for _, rect in obstacles):
-                    candidates.append((angle, target_x, target_y))
-                    break
-            y -= step
-
-    if not candidates:
-        raise RuntimeError(
-            "ESP8266EX cannot fit vertically at the right board edge while "
-            "clearing D3, J1 and J2. Increase PCB width or revise the fixed anchors."
-        )
-
-    # Rebuild the chosen mirrored/oriented state from a clean F.Cu baseline,
-    # then apply its translation. Do not reuse a footprint state left by the
-    # other angle's search: KiCad's flip operation can change its local origin.
-    angle, _, _ = sorted(candidates, key=lambda item: (item[0] != 90, -item[2]))[0]
-    initial = configure_back_orientation(angle)
-    width, height = rectangle_dimensions(initial)
-    target_left = mm(PCB_WIDTH - BOARD_MARGIN) - width
-    target_x = int(target_left - initial[0])
-    min_top = mm(BOARD_MARGIN)
-    max_top = mm(PCB_HEIGHT - BOARD_MARGIN) - height
-    target_y = None
-    y = max_top
-    while y >= min_top:
-        trial_y = int(y - initial[1])
-        footprint.SetPosition(pcbnew.VECTOR2I(target_x, trial_y))
-        bounds = footprint_placement_bounds(footprint)
-        if rectangle_inside_board(bounds):
-            expanded = expand_rectangle(bounds, ESP_CLEARANCE)
-            if not any(rectangle_overlap(
-                expanded, expand_rectangle(rect, COMPONENT_CLEARANCE / 2.0)
-            ) for _, rect in obstacles):
-                target_y = trial_y
-                break
-        y -= step
-
-    if target_y is None:
-        raise RuntimeError("ESP8266EX placement changed while restoring its final orientation")
-
-    footprint.SetPosition(pcbnew.VECTOR2I(target_x, target_y))
+def _set_footprint_center(footprint, center_x, center_y):
     bounds = footprint_placement_bounds(footprint)
-    if not rectangle_inside_board(bounds):
-        raise RuntimeError(
-            "ESP8266EX final transformed bounds are outside the board: {}".format(
-                tuple(round(to_mm(v), 2) for v in bounds)
-            )
-        )
+    cx, cy = (bounds[0] + bounds[2]) // 2, (bounds[1] + bounds[3]) // 2
+    pos = footprint.GetPosition()
+    footprint.SetPosition(pcbnew.VECTOR2I(
+        int(pos.x + mm(center_x) - cx), int(pos.y + mm(center_y) - cy)
+    ))
+    return footprint_placement_bounds(footprint)
 
+
+def place_fixed_esp(board, nets, esp, report, audit_errors, fixed_obstacles=None):
+    """Place the bare QFN32 at the lower-right, with LNA pad 2 facing the PCB edge."""
+    esp["side"] = "B"
+    fp = esp["footprint"]
+    _flip_footprint_to_back(board, fp, "U1")
+    best = None
+    for angle in (0, 90, 180, 270):
+        fp.SetOrientationDegrees(angle)
+        fp.SetPosition(point(0, 0))
+        pos = find_footprint_pad(fp, "2").GetPosition()
+        if best is None or pos.x > best[0]:
+            best = (pos.x, angle)
+    fp.SetOrientationDegrees(best[1])
+    fp.SetPosition(point(0, 0))
+    bounds = _set_footprint_center(fp, 36.4, 49.0)
+    if not rectangle_inside_board(bounds):
+        raise RuntimeError("ESP8266EX QFN32 does not fit at its right-edge anchor")
     esp["local_bounds"] = bounds
     esp["width"], esp["height"] = rectangle_dimensions(bounds)
     assign_component_nets(esp, nets, report, audit_errors)
     report.extend([
-        "U1: Espressif ESP8266EX Wi-Fi module on B.Cu, vertical at right board edge",
-        "ESP8266EX onboard antenna used; no board U.FL connector, coax pigtail or external PCB meander",
-        "ESP8266EX onboard SPI flash and crystal used; pads 9-14 are intentional NC flash connections",
-        "Module placement checked against central LED D3, USB-C J1 and solenoid connector J2"
+        "U1: bare Espressif ESP8266EX QFN32 on B.Cu at lower-right",
+        "U1 pad 2 LNA faces the right-hand PCB antenna matching network",
+        "External W25Q32 flash, 26 MHz crystal and RES12K resistor are fitted"
     ])
-    print(
-        "ESP8266EX U1 placed vertically on B.Cu at right edge; orientation:", angle,
-        "bounds:", tuple(round(to_mm(v), 2) for v in bounds)
-    )
+    print("ESP8266EX bare QFN32 placed on B.Cu; orientation {} bounds {}".format(
+        best[1], tuple(round(to_mm(v), 2) for v in bounds)), flush=True)
     return expand_rectangle(bounds, ESP_CLEARANCE)
 
+
+ESP_SUPPORT_REFS = {"U2", "Y1", "R25", "C18", "C19", "C20", "L2", "C21", "C22"}
+
+
+def place_esp_support_components(board, nets, prepared, esp_item, report, audit_errors):
+    """Place external flash, crystal, decoupling, RES12K and RF matching parts."""
+    by_ref = {item["reference"]: item for item in prepared}
+    fixed = {
+        "U2": (30.5, 53.5, 0), "Y1": (30.5, 46.5, 0),
+        "R25": (33.2, 44.0, 0), "C18": (33.0, 53.5, 0),
+        "C19": (33.0, 47.5, 90), "C20": (33.0, 45.8, 90),
+    }
+    placed = []
+    for ref, (x, y, angle) in fixed.items():
+        item = by_ref[ref]
+        item["side"] = "B"
+        fp = item["footprint"]
+        _flip_footprint_to_back(board, fp, ref)
+        fp.SetOrientationDegrees(angle)
+        bounds = _set_footprint_center(fp, x, y)
+        if not rectangle_inside_board(bounds):
+            raise RuntimeError("{} is outside the board".format(ref))
+        item["local_bounds"] = bounds
+        item["width"], item["height"] = rectangle_dimensions(bounds)
+        assign_component_nets(item, nets, report, audit_errors)
+        placed.append(item)
+    lna = find_footprint_pad(esp_item["footprint"], "2").GetPosition()
+    lx, ly = to_mm(lna.x), to_mm(lna.y)
+    for ref, x, y, angle in (
+        ("L2", lx + 1.25, ly, 0),
+        ("C21", lx + 0.55, ly + 1.05, 90),
+        ("C22", lx + 1.95, ly + 1.05, 90),
+    ):
+        item = by_ref[ref]
+        item["side"] = "B"
+        fp = item["footprint"]
+        _flip_footprint_to_back(board, fp, ref)
+        fp.SetOrientationDegrees(angle)
+        bounds = _set_footprint_center(fp, x, y)
+        if not rectangle_inside_board(bounds):
+            raise RuntimeError("{} RF matching footprint is outside the board".format(ref))
+        item["local_bounds"] = bounds
+        item["width"], item["height"] = rectangle_dimensions(bounds)
+        assign_component_nets(item, nets, report, audit_errors)
+        placed.append(item)
+    report.append("ESP support group: W25Q32, 26 MHz crystal, load capacitors, decoupling and 12k RES12K")
+    report.append("RF pi network: L2=0R initial series link; C21/C22 DNP pending VNA tuning")
+    return placed
 
 def place_fixed_usb(board, nets, usb, report, audit_errors):
     """Place mirrored USB-C J1 on B.Cu at lower-left, opening facing left."""
@@ -2535,7 +2504,7 @@ def create_gnd_stitching(board, nets, report):
     it did not actually place any.  That left the F.Cu and B.Cu GND zone fills
     as separate copper islands, which KiCad reported as unconnected zone
     items.  Place real through-vias in clear board areas, while keeping a wider
-    exclusion around U1 so its onboard ESP8266EX antenna is not obstructed.
+    exclusion around U1 so its ESP8266EX bare-chip design is not obstructed.
     """
     obstacles = []
     for footprint in board.GetFootprints():
@@ -2991,8 +2960,8 @@ def create_labels(board):
     )
 
     add_text(
-        board, "RF KEEP CLEAR",
-        1.0, 8.8, 0.55
+        board, "PCB ANTENNA KEEP CLEAR",
+        40.2, 40.0, 0.45
     )
 
     add_text(
@@ -3248,32 +3217,35 @@ def export_dsn(board):
 # ================================================================
 
 def create_esp8266_printed_antenna(board, nets, esp_item, report):
-    """Prototype folded antenna at the same right-hand PCB edge; requires VNA tuning."""
-    lna = find_footprint_pad(esp_item["footprint"], "2")
-    p = lna.GetPosition()
+    """Add a prototype right-edge PCB radiator from the RF pi-network output."""
+    l2 = next(fp for fp in board.GetFootprints() if fp.GetReference() == "L2")
+    p = find_footprint_pad(l2, "2").GetPosition()
     sx, sy = to_mm(p.x), to_mm(p.y)
     route = [
         (sx, sy), (42.0, sy), (44.5, sy),
-        (44.5, 59.0), (41.5, 59.0),
-        (41.5, 52.0), (44.5, 52.0),
-        (44.5, 45.0), (41.5, 45.0),
-        (41.5, 38.0)
+        (44.5, sy + 6.0), (41.5, sy + 6.0),
+        (41.5, sy), (44.5, sy),
+        (44.5, sy - 6.0), (41.5, sy - 6.0),
     ]
+    if min(y for _, y in route) < 2.0 or max(y for _, y in route) > PCB_HEIGHT - 2.0:
+        raise RuntimeError("RF antenna meander does not fit in the right-edge corridor")
     add_polyline(board, nets["RF_ANT"], route, 0.80, pcbnew.B_Cu)
     zone = pcbnew.ZONE(board)
     zone.SetLayer(pcbnew.F_Cu)
-    if hasattr(zone, "SetIsRuleArea"): zone.SetIsRuleArea(True)
-    for name in ("SetDoNotAllowTracks","SetDoNotAllowVias","SetDoNotAllowFootprints","SetDoNotAllowZoneFills"):
+    if hasattr(zone, "SetIsRuleArea"):
+        zone.SetIsRuleArea(True)
+    for name in ("SetDoNotAllowTracks", "SetDoNotAllowVias", "SetDoNotAllowFootprints", "SetDoNotAllowZoneFills"):
         fn = getattr(zone, name, None)
-        if callable(fn): fn(True)
+        if callable(fn):
+            fn(True)
     outline = zone.Outline()
     outline.NewOutline()
-    for x,y in ((40.0,34.0),(PCB_WIDTH,34.0),(PCB_WIDTH,PCB_HEIGHT),(40.0,PCB_HEIGHT)):
+    for x, y in ((40.0, 39.0), (PCB_WIDTH, 39.0), (PCB_WIDTH, 59.0), (40.0, 59.0)):
         outline.Append(int(mm(x)), int(mm(y)))
     board.Add(zone)
-    report.append("B.Cu printed right-edge meander antenna; F.Cu antenna keepout 40-46mm X, 34-62mm Y")
-    report.append("RF pi network: L2 series link; C21/C22 DNP shunt positions; VNA tune required")
-
+    report.append("B.Cu right-edge folded PCB antenna starts at L2 pad 2; F.Cu 40-46 x 39-59 mm keepout")
+    report.append("RF feed: U1 LNA -> L2 series -> printed antenna; C21/C22 are shunt DNP pads")
+    report.append("Prototype radiator and pi values require VNA tuning on final PCB/enclosure")
 
 def build_board():
     os.makedirs(
@@ -3295,16 +3267,16 @@ def build_board():
     print("Separate M2 board mounting holes: none; connector mechanical holes reserved on both sides")
     print("RF: B.Cu printed right-edge meander antenna with pi matching footprints")
     print("Central LED: fixed at board centre")
-    print("ESP8266EX: B.Cu lower-right; external flash/crystal and edge PCB antenna")
+    print("ESP8266EX bare QFN32: B.Cu lower-right; external flash/crystal and edge PCB antenna")
     print("General component clearance: {:.2f} mm per footprint envelope".format(COMPONENT_CLEARANCE))
-    print("Placement strategy: balanced occupancy grid; external flash/crystal and reserved antenna corridor")
+    print("Placement strategy: balanced occupancy grid; U1 support group and reserved antenna corridor")
     print("Two-sided component placement: all legal board areas used outside the solenoid row")
-    print("USB-C J1: fixed left edge above antenna, mirrored, receptacle opening facing left")
+    print("USB-C J1: fixed left edge, mirrored, receptacle opening facing left")
     print("Solenoid J2: fixed above central LED D3; its full-width horizontal row is reserved")
     print("R19: 470 ohms")
     print("USB-C shell tabs S1-S4 / SH1-SH4 -> GND")
-    print("Components: all non-anchor parts below LED; solenoid J2 above LED; GND pours on both layers")
-    print("GND pads: explicitly assigned by PAD_NETS; GND and 3V3 pours generated on both layers")
+    print("Components: support group beside U1; remaining parts packed around fixed anchors")
+    print("Copper pours are disabled; all remaining nets require tracks/vias")
 
     prepared, led = prepare_all_components()
 
@@ -3390,6 +3362,9 @@ def build_board():
         board, nets, esp_item, report, audit_errors,
         fixed_obstacles=[led, usb_item, solenoid_item]
     )
+    esp_support_items = place_esp_support_components(
+        board, nets, prepared, esp_item, report, audit_errors
+    )
     create_esp8266_printed_antenna(board, nets, esp_item, report)
 
     for fixed_item in (usb_item, esp_item, led):
@@ -3407,20 +3382,24 @@ def build_board():
     # the fixed anchors and full-width J2 row.
     # Pack F.Cu first, then reserve every front-side component envelope while
     # packing B.Cu to avoid opposite-side body/pad overlap in XY.
+    support_clearances = [
+        expand_rectangle(footprint_placement_bounds(item["footprint"]), COMPONENT_CLEARANCE / 2.0)
+        for item in esp_support_items
+    ]
     fixed_anchor_rectangles = [
         led_clearance, usb_clearance, solenoid_clearance, esp_clearance,
         solenoid_row_band
-    ]
-    fixed_anchor_items = [led, usb_item, solenoid_item, esp_item]
+    ] + support_clearances
+    fixed_anchor_items = [led, usb_item, solenoid_item, esp_item] + esp_support_items
 
     front_items = [
         item for item in prepared
-        if item["reference"] not in ("U1", "J1", "J2")
+        if item["reference"] not in ({"U1", "J1", "J2"} | ESP_SUPPORT_REFS)
         and item["side"] == "F"
     ]
     bottom_items = [
         item for item in prepared
-        if item["reference"] not in ("U1", "J1", "J2")
+        if item["reference"] not in ({"U1", "J1", "J2"} | ESP_SUPPORT_REFS)
         and item["side"] == "B"
     ]
 
@@ -3460,7 +3439,7 @@ def build_board():
     if solenoid_item["footprint"].GetLayer() != pcbnew.F_Cu:
         raise RuntimeError("Solenoid connector J2 must remain on F.Cu")
 
-    placed = [esp_item, usb_item, solenoid_item] + front + back
+    placed = [esp_item, usb_item, solenoid_item] + esp_support_items + front + back
 
     # Final placement audit before saving.
     verify_placement(
@@ -3469,8 +3448,7 @@ def build_board():
         solenoid_row_band
     )
 
-    # ESP8266EX has its own module antenna. No external PCB meander or U.FL
-    # connector is generated; this also removes the old oversized RF rule area.
+    # Bare-chip RF path and host PCB antenna have been added above.
 
     # Apply pad geometry and local-clearance changes before zone fill so both
     # copper planes are calculated from the final footprints.
@@ -3543,12 +3521,13 @@ def build_board():
     print("3. Two non-plated alignment holes are mechanical only.")
     print("4. USB data pads remain intentionally unconnected.")
 
-    print("\nRF MODULE:")
-    print("1. ESP8266EX uses external W25Q32 4MB SPI flash and 26MHz crystal.")
-    print("2. RES12K pin 31 is connected through R25=12k to GND.")
-    print("3. Printed B.Cu antenna is at the right board edge; F.Cu keepout is generated.")
-    print("4. L2/C21/C22 form a tunable pi network; measure and tune with a VNA.")
-    print("5. Verify 12pF crystal load capacitors against the selected crystal CL.")
+    print("\nESP8266EX BARE CHIP:")
+    print("1. U1 is a bare ESP8266EX QFN32, not an ESP8266EX bare-chip design module.")
+    print("2. External W25Q32 4MB SPI flash and 26MHz crystal are fitted.")
+    print("3. RES12K pin 31 is connected through R25=12k to GND.")
+    print("4. Printed B.Cu antenna is fed from L2; C21/C22 are DNP shunt positions.")
+    print("5. Verify crystal load capacitors against the selected crystal CL.")
+    print("6. RF geometry and matching values require VNA tuning.")
 
     print("\nNEXT:")
     print("1. Open PCB in KiCad.")
