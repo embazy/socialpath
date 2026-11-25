@@ -700,7 +700,473 @@ PAD_NETS = {
     "L2": {"1":"RF_IN","2":"RF_ANT"},
     "C21": {"1":"RF_IN","2":"GND"},
     "C22": {"1":"RF_ANT","2":"GND"},
+    "U3": {
+        "1": "BAT+", "2": "NC_PG", "3": "3V3_AUX",
+        "4": "GND", "5": "U3_FB", "6": "NC_FB2",
+        "7": "3V3", "8": "3V3", "7,8": "3V3",
+        "9": "U3_SW_B", "10": "GND", "11": "U3_SW_A",
+        "12": "BAT+", "13": "BAT+", "12,13": "BAT+",
+        "14": "BAT+", "15": "GND"
+    },
 
+    "U4": {
+        "1": "CHARGE_STATUS", "2": "GND",
+        "3": "BAT+", "4": "USB_VBUS", "5": "CHARGE_PROG"
+    },
+
+    "U6": {
+        "1": "DW_OD", "2": "DW_CS", "3": "DW_OC",
+        "4": "NC_DW", "5": "DW_VCC", "6": "BAT-"
+    },
+
+    "Q2": {
+        "1": "BAT_FET_COMMON", "8": "BAT_FET_COMMON",
+        "2": "BAT-", "3": "BAT-", "4": "DW_OD",
+        "5": "DW_OC", "6": "GND", "7": "GND"
+    },
+
+    "U7": {
+        "1": "BAT+", "2": "NC_PG", "3": "3V_SOL_AUX",
+        "4": "GND", "5": "U7_FB", "6": "NC_FB2",
+        "7": "3V_SOLENOID", "8": "3V_SOLENOID",
+        "7,8": "3V_SOLENOID", "9": "U7_SW_B",
+        "10": "GND", "11": "U7_SW_A",
+        "12": "BAT+", "13": "BAT+", "12,13": "BAT+",
+        "14": "BAT+", "15": "GND"
+    },
+
+    "Q1": {
+        "1": "SOLENOID_GATE", "2": "GND", "3": "SOLENOID_LOW"
+    },
+
+    "D1": {
+        "1": "3V_SOLENOID", "2": "SOLENOID_LOW"
+    },
+
+    "J3": {
+        "1": "BAT+", "2": "BAT-"
+    },
+
+    "J2": {
+        "1": "3V_SOLENOID", "2": "SOLENOID_LOW"
+    },
+
+    "J1": {
+        "A1": "GND", "A4": "USB_VBUS",
+        "A5": "USB_CC1", "A6": "NC_USB_DATA",
+        "A7": "NC_USB_DATA", "A8": "NC_USB",
+        "A9": "USB_VBUS", "A12": "GND",
+        "B1": "GND", "B4": "USB_VBUS",
+        "B5": "USB_CC2", "B6": "NC_USB_DATA",
+        "B7": "NC_USB_DATA", "B8": "NC_USB",
+        "B9": "USB_VBUS", "B12": "GND",
+        # KiCad USB-C footprints use S1-S4 for the four shield tabs.
+        # Some vendor/library variants label these SH1-SH4 or SH.
+        "S1": "GND", "S2": "GND", "S3": "GND", "S4": "GND",
+        "SH": "GND", "SH1": "GND", "SH2": "GND",
+        "SH3": "GND", "SH4": "GND"
+    },
+
+    "D3": {
+        "1": "3V3", "2": "NC_LED_DO",
+        "3": "GND", "4": "LED_DATA_IN"
+    },
+
+
+    "R13": {
+        "1": "3V3", "2": "U3_FB"
+    },
+
+    "R14": {
+        "1": "U3_FB", "2": "GND"
+    },
+
+    "R17": {
+        "1": "3V_SOLENOID", "2": "U7_FB"
+    },
+
+    "R18": {
+        "1": "U7_FB", "2": "GND"
+    },
+
+
+
+    "R3": {
+        "1": "3V3", "2": "ESP_RST"
+    },
+
+    "R4": {
+        "1": "3V3", "2": "ESP_GPIO0"
+    },
+
+    "R5": {
+        "1": "3V3", "2": "ESP_GPIO2"
+    },
+
+    "R6": {
+        "1": "ESP_GPIO15", "2": "GND"
+    },
+
+    "R7": {
+        "1": "CHARGE_PROG", "2": "GND"
+    },
+
+    "R8": {
+        "1": "SOLENOID_GATE", "2": "ESP_GPIO4"
+    },
+
+    "R9": {
+        "1": "SOLENOID_GATE", "2": "GND"
+    },
+
+
+    "R19": {
+        "1": "BAT+", "2": "DW_VCC"
+    },
+
+    "R20": {
+        "1": "DW_CS", "2": "GND"
+    },
+
+    "R21": {
+        "1": "USB_CC1", "2": "GND"
+    },
+
+    "R22": {
+        "1": "USB_CC2", "2": "GND"
+    },
+
+    "R23": {
+        "1": "BAT+", "2": "BATTERY_SENSE"
+    },
+
+    "R24": {
+        "1": "BATTERY_SENSE", "2": "GND"
+    },
+
+    "L1": {
+        "1": "U3_SW_A", "2": "U3_SW_B"
+    },
+
+    "L3": {
+        "1": "U7_SW_A", "2": "U7_SW_B"
+    },
+
+    "C4": {
+        "1": "BAT+", "2": "GND"
+    },
+
+    "C5": {
+        "1": "3V3", "2": "GND"
+    },
+
+    "C6": {
+        "1": "3V3_AUX", "2": "GND"
+    },
+
+    "C7": {
+        "1": "BAT+", "2": "GND"
+    },
+
+    "C10": {
+        "1": "BAT+", "2": "GND"
+    },
+
+    "C11": {
+        "1": "3V_SOLENOID", "2": "GND"
+    },
+
+    "C12": {
+        "1": "3V_SOL_AUX", "2": "GND"
+    },
+
+    "C13": {
+        "1": "USB_VBUS", "2": "GND"
+    },
+
+    "C14": {
+        "1": "BAT+", "2": "GND"
+    },
+
+    "C15": {
+        "1": "DW_VCC", "2": "BAT-"
+    },
+
+    "C1": {
+        "1": "3V3", "2": "GND"
+    },
+
+    "C2": {
+        "1": "3V3", "2": "GND"
+    },
+
+    "C3": {
+        "1": "3V3", "2": "GND"
+    },
+
+    "C16": {
+        "1": "3V3", "2": "GND"
+    },
+
+    "C17": {
+        "1": "3V3", "2": "GND"
+    }
+}
+
+
+# ================================================================
+# GEOMETRY
+# ================================================================
+
+def mm(value):
+    return pcbnew.FromMM(float(value))
+
+
+def point(x, y):
+    return pcbnew.VECTOR2I(mm(x), mm(y))
+
+
+def to_mm(value):
+    return float(pcbnew.ToMM(int(value)))
+
+
+def item_bounds(item):
+    box = item.GetBoundingBox()
+
+    return (
+        int(box.GetX()),
+        int(box.GetY()),
+        int(box.GetX() + box.GetWidth()),
+        int(box.GetY() + box.GetHeight())
+    )
+
+
+def union_bounds(items):
+    if not items:
+        return None
+
+    return (
+        min(r[0] for r in items),
+        min(r[1] for r in items),
+        max(r[2] for r in items),
+        max(r[3] for r in items)
+    )
+
+
+def expand_rectangle(rect, clearance):
+    x1, y1, x2, y2 = rect
+    gap = mm(clearance)
+
+    return (
+        x1-gap,
+        y1-gap,
+        x2+gap,
+        y2+gap
+    )
+
+
+def rectangle_dimensions(rect):
+    return (
+        rect[2]-rect[0],
+        rect[3]-rect[1]
+    )
+
+
+def rectangle_overlap(a, b):
+    return not (
+        a[2] <= b[0] or b[2] <= a[0] or
+        a[3] <= b[1] or b[3] <= a[1]
+    )
+
+
+def rectangle_inside_board(rect):
+    margin = mm(BOARD_MARGIN)
+
+    return (
+        rect[0] >= margin
+        and rect[1] >= margin
+        and rect[2] <= mm(PCB_WIDTH)-margin
+        and rect[3] <= mm(PCB_HEIGHT)-margin
+    )
+
+
+def mounting_hole_keepouts():
+    result = []
+    radius = MOUNT_HOLE_CLEARANCE
+
+    for _, x, y in MOUNT_HOLES:
+        result.append((
+            mm(x-radius),
+            mm(y-radius),
+            mm(x+radius),
+            mm(y+radius)
+        ))
+
+    return result
+
+
+# ================================================================
+# COURTYARD BOUNDS
+# ================================================================
+
+def footprint_pad_items(footprint):
+    """Return all electrical PAD objects without iterating SWIG vectors.
+
+    KiCad's GetPadCount() defaults to INCLUDE_NPTH.  The USB-C footprint has
+    20 electrical pads plus two NPTH locating holes, so comparing that default
+    count (22) with the electrical pads returned by GetUniquePadNumbers() and
+    FindPadByNumber() incorrectly reports two missing pads.  Count only
+    electrical pads with EXCLUDE_NPTH, then walk every unique pad number and
+    its duplicate-number pads using FindPadByNumber().
+
+    This avoids FOOTPRINT.Pads(), GetPads()' non-iterable SWIG vector, and
+    RunOnChildren()'s unmarshalable std::function callback.
+    """
+    result = []
+    errors = []
+
+    # Count only copper/electrical pads. NPTH locating holes are mechanical
+    # and must not be passed to net assignment or pad-number validation.
+    try:
+        # KiCad 10 exports this enum as pcbnew.DO_NOT_INCLUDE_NPTH.
+        # INCLUDE_NPTH is the default and counts J1's two locating holes.
+        exclude_npth = getattr(pcbnew, "DO_NOT_INCLUDE_NPTH", None)
+        if exclude_npth is None:
+            # Some older builds expose the enum as a nested type.
+            include_type = getattr(pcbnew, "INCLUDE_NPTH_T", None)
+            exclude_npth = getattr(include_type, "EXCLUDE_NPTH", None) if include_type else None
+        if exclude_npth is None:
+            raise RuntimeError("pcbnew.DO_NOT_INCLUDE_NPTH enum is unavailable")
+        physical_count = int(footprint.GetPadCount(exclude_npth))
+    except Exception as exc:
+        physical_count = -1
+        errors.append("GetPadCount(EXCLUDE_NPTH): {}".format(exc))
+
+    try:
+        raw_numbers = footprint.GetUniquePadNumbers()
+        unique_numbers = sorted(set(str(n) for n in list(raw_numbers)))
+    except Exception as exc:
+        unique_numbers = []
+        errors.append("GetUniquePadNumbers: {}".format(exc))
+
+    for number in unique_numbers:
+        try:
+            pad = footprint.FindPadByNumber(number)
+        except Exception as exc:
+            errors.append("FindPadByNumber({}): {}".format(number, exc))
+            continue
+
+        duplicate_guard = 0
+        while pad is not None and duplicate_guard < 512:
+            # Prevent returning the same SWIG proxy twice.
+            try:
+                pointer = pad.this
+            except Exception:
+                pointer = None
+            if pointer is not None and any(
+                getattr(existing, "this", None) == pointer for existing in result
+            ):
+                break
+            result.append(pad)
+            duplicate_guard += 1
+            try:
+                next_pad = footprint.FindPadByNumber(number, pad)
+            except Exception as exc:
+                errors.append("duplicate lookup {}: {}".format(number, exc))
+                break
+            if next_pad is None:
+                break
+            try:
+                if next_pad.this == pad.this:
+                    break
+            except Exception:
+                if next_pad == pad:
+                    break
+            pad = next_pad
+
+    if physical_count >= 0 and len(result) != physical_count:
+        detail = "found {} electrical pads; KiCad EXCLUDE_NPTH count {}; unique numbers={!r}".format(
+            len(result), physical_count, unique_numbers
+        )
+        if errors:
+            detail += "; " + "; ".join(errors)
+        raise RuntimeError("KiCad footprint pad lookup failed: " + detail)
+
+    if physical_count < 0 and not result:
+        detail = "; ".join(errors) if errors else "no pad numbers returned"
+        raise RuntimeError("KiCad could not retrieve footprint pads: " + detail)
+
+    return result
+
+
+def find_footprint_pad(footprint, pad_number):
+    """Return the first electrical pad with the requested pad number.
+
+    Uses footprint_pad_items(), which retrieves KiCad 10 SWIG pad objects
+    without relying on the non-iterable Pads()/GetPads() wrappers.
+    """
+    wanted = str(pad_number)
+    for pad in footprint_pad_items(footprint):
+        try:
+            if str(pad.GetNumber()) == wanted:
+                return pad
+        except Exception:
+            continue
+    raise RuntimeError(
+        "Footprint {!r} has no electrical pad numbered {!r}".format(
+            footprint.GetFPIDAsString() if hasattr(footprint, "GetFPIDAsString") else footprint.GetReference(),
+            wanted
+        )
+    )
+
+
+def footprint_placement_bounds(footprint):
+    # Use the transformed physical footprint envelope, not just courtyard
+    # graphics. A number of library footprints have incomplete/missing
+    # courtyards; using only F_CrtYd/B_CrtYd then packs their pads or bodies
+    # on top of neighbouring back-side parts. Include courtyard, fabrication
+    # and silkscreen outlines on either side, plus every pad. All coordinates
+    # are read from pcbnew after the footprint has been flipped and placed.
+    envelope_layers = {
+        pcbnew.F_CrtYd,
+        pcbnew.B_CrtYd,
+        pcbnew.F_Fab,
+        pcbnew.B_Fab,
+        pcbnew.F_SilkS,
+        pcbnew.B_SilkS,
+    }
+
+    parts = []
+
+    try:
+        graphics = footprint.GraphicalItems()
+    except Exception:
+        graphics = []
+
+    for graphic in graphics:
+        try:
+            if graphic.GetLayer() in envelope_layers:
+                parts.append(item_bounds(graphic))
+        except Exception:
+            pass
+
+    # Pads are always part of the physical envelope, even when a library
+    # footprint has no courtyard or fabrication outline.
+    try:
+        for pad in footprint_pad_items(footprint):
+            try:
+                parts.append(item_bounds(pad))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    bounds = union_bounds(parts)
+    if bounds is not None:
+        return bounds
+
+    # Last-resort fallback for unusual custom footprint types.
+    return item_bounds(footprint)
 
 
 # ================================================================
