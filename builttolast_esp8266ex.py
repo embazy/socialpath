@@ -2290,13 +2290,23 @@ def verify_placement(placed, led, solenoid_row_band):
 
         for item_b in all_items[index+1:]:
             rect_b = footprint_placement_bounds(item_b["footprint"])
+            # The extra ESP exclusion radius is for unrelated components.
+            # Its own crystal, flash, decouplers and RF matching parts must sit
+            # close to the QFN pads; they are already placed deliberately and
+            # still receive the normal physical courtyard clearance.
+            a_is_esp_support = item_a["reference"] in ESP_SUPPORT_REFS
+            b_is_esp_support = item_b["reference"] in ESP_SUPPORT_REFS
             clearance_a = (
-                ESP_CLEARANCE
+                COMPONENT_CLEARANCE / 2.0
+                if item_a["reference"] == "U1" and b_is_esp_support
+                else ESP_CLEARANCE
                 if item_a["reference"] == "U1"
                 else COMPONENT_CLEARANCE / 2.0
             )
             clearance_b = (
-                ESP_CLEARANCE
+                COMPONENT_CLEARANCE / 2.0
+                if item_b["reference"] == "U1" and a_is_esp_support
+                else ESP_CLEARANCE
                 if item_b["reference"] == "U1"
                 else COMPONENT_CLEARANCE / 2.0
             )
