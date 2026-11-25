@@ -1084,13 +1084,19 @@ def footprint_pad_items(footprint):
                     break
             pad = next_pad
 
+    # KiCad 10's DO_NOT_INCLUDE_NPTH enum has returned an inflated count
+    # for some footprints (e.g. QFN32: 42 reported vs 33 actual numbered
+    # electrical pads). The unique-number walk above is authoritative: it
+    # returns each numbered copper pad, including duplicate-number pads.
+    # Keep the reported count as diagnostics only; do not reject a footprint
+    # when KiCad's count API disagrees with the actual pad objects.
     if physical_count >= 0 and len(result) != physical_count:
-        detail = "found {} electrical pads; KiCad EXCLUDE_NPTH count {}; unique numbers={!r}".format(
-            len(result), physical_count, unique_numbers
+        print(
+            "NOTE: KiCad pad-count API reports {}; enumerated {} numbered pads for {}".format(
+                physical_count, len(result), footprint.GetFPID().GetLibItemName()
+            ),
+            flush=True
         )
-        if errors:
-            detail += "; " + "; ".join(errors)
-        raise RuntimeError("KiCad footprint pad lookup failed: " + detail)
 
     if physical_count < 0 and not result:
         detail = "; ".join(errors) if errors else "no pad numbers returned"
