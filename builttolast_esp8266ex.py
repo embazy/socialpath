@@ -1855,8 +1855,8 @@ def place_esp_support_components(board, nets, prepared, esp_item, report, audit_
     by_ref = {item["reference"]: item for item in prepared}
     fixed = {
         "U2": (30.5, 53.5, 0), "Y1": (30.5, 46.5, 0),
-        "R25": (33.2, 44.0, 0), "C18": (33.0, 53.5, 0),
-        "C19": (33.0, 47.5, 90), "C20": (33.0, 45.8, 90),
+        "R25": (32.8, 44.0, 0), "C18": (34.2, 55.5, 0),
+        "C19": (33.1, 48.5, 90), "C20": (33.1, 44.5, 90),
     }
     placed = []
     for ref, (x, y, angle) in fixed.items():
@@ -3224,8 +3224,8 @@ def create_esp8266_printed_antenna(board, nets, esp_item, report):
     route = [
         (sx, sy), (42.0, sy), (44.5, sy),
         (44.5, sy + 6.0), (41.5, sy + 6.0),
-        (41.5, sy), (44.5, sy),
-        (44.5, sy - 6.0), (41.5, sy - 6.0),
+        (41.5, sy - 6.0), (44.5, sy - 6.0),
+        (44.5, sy - 12.0), (41.5, sy - 12.0),
     ]
     if min(y for _, y in route) < 2.0 or max(y for _, y in route) > PCB_HEIGHT - 2.0:
         raise RuntimeError("RF antenna meander does not fit in the right-edge corridor")
