@@ -1854,7 +1854,7 @@ def place_esp_support_components(board, nets, prepared, esp_item, report, audit_
     """Place external flash, crystal, decoupling, RES12K and RF matching parts."""
     by_ref = {item["reference"]: item for item in prepared}
     fixed = {
-        "U2": (27.5, 55.5, 0), "Y1": (30.5, 46.5, 0),
+        "U2": (19.5, 54.5, 0), "Y1": (30.5, 46.5, 0),
         "R25": (32.8, 44.0, 0), "C18": (34.2, 55.5, 0),
         "C19": (33.1, 48.5, 90), "C20": (33.1, 44.5, 90),
     }
@@ -1870,8 +1870,14 @@ def place_esp_support_components(board, nets, prepared, esp_item, report, audit_
             raise RuntimeError("{} is outside the board".format(ref))
         item["local_bounds"] = bounds
         item["width"], item["height"] = rectangle_dimensions(bounds)
+        if ref == "U2":
+            print("DEBUG U2 flash courtyard bounds (mm): {}".format(
+                tuple(round(to_mm(v), 2) for v in bounds)), flush=True)
         assign_component_nets(item, nets, report, audit_errors)
         placed.append(item)
+    esp_bounds = footprint_placement_bounds(esp_item["footprint"])
+    print("DEBUG U1 ESP8266EX courtyard bounds (mm): {}".format(
+        tuple(round(to_mm(v), 2) for v in esp_bounds)), flush=True)
     lna = find_footprint_pad(esp_item["footprint"], "2").GetPosition()
     lx, ly = to_mm(lna.x), to_mm(lna.y)
     for ref, x, y, angle in (
