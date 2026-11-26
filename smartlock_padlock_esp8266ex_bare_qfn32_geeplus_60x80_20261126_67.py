@@ -948,6 +948,10 @@ PAD_NETS = {
 }
 
 
+# Bare ESP8266EX PCB antenna region at the lower/right board edge.
+# Keep this region free of footprints and GND stitching vias.
+RF_ANTENNA_BOUNDS_MM = (49.5, 53.0, 59.0, 61.5)
+
 # ================================================================
 # GEOMETRY
 # ================================================================
@@ -1320,6 +1324,30 @@ def prepare_all_components():
     led = prepare_component(CENTRAL_LED)
 
     return prepared, led
+
+
+def create_esp8266_rf_antenna(board, nets, report):
+    """Create the initial right-edge PCB meander on the RF_ANT net.
+
+    The approximately 30.6 mm copper path is a starting geometry only.
+    Final antenna length, impedance and matching values require VNA tuning.
+    """
+    path = [
+        (50.2, 54.0), (58.2, 54.0),
+        (58.2, 56.2), (50.2, 56.2),
+        (50.2, 58.4), (58.2, 58.4),
+        (58.2, 60.6)
+    ]
+    for start, end in zip(path[:-1], path[1:]):
+        track = pcbnew.PCB_TRACK(board)
+        track.SetStart(point(start[0], start[1]))
+        track.SetEnd(point(end[0], end[1]))
+        track.SetWidth(mm(0.30))
+        track.SetLayer(pcbnew.F_Cu)
+        track.SetNet(nets["RF_ANT"])
+        board.Add(track)
+    report.append("RF antenna: 30.6 mm initial right-edge meander, RF_ANT net; tune on hardware")
+    print("ESP8266EX right-edge PCB antenna copper created; initial path approximately 30.6 mm")
 
 
 # ================================================================
@@ -1796,16 +1824,14 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
 
     step = max(1, mm(PLACEMENT_GRID_STEP))
     margin = mm(BOARD_MARGIN)
-    min_top = margin
+    min_top = mm(PLACEMENT_LOWER_HALF_START + BOARD_MARGIN)
     max_right = mm(PCB_WIDTH) - margin
     max_bottom = mm(PCB_HEIGHT) - margin
     best = None
     diagnostics = []
 
-    # The ESP-12F module is rectangular. A quarter-turn changes which
-    # dimension consumes the narrow remaining strip beside the solenoid.
-    # Test every orthogonal orientation rather than assuming 270 degrees.
-    for orientation in (270, 90, 0, 180):
+    # The QFN is square; prefer 180 degrees so LNA pin 2 faces the right-edge antenna.
+    for orientation in (180, 0, 90, 270):
         footprint.SetOrientationDegrees(orientation)
         footprint.SetPosition(point(0, 0))
         initial = footprint_placement_bounds(footprint)
@@ -1854,9 +1880,9 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
                 score = (
                     left,
                     top,
-                    1 if orientation == 270 else
-                    0 if orientation == 90 else
-                    -1 if orientation == 0 else -2
+                    1 if orientation == 180 else
+                    0 if orientation == 0 else
+                    -1 if orientation == 90 else -2
                 )
                 if best is None or score > best[0]:
                     best = (score, orientation, left, top, initial, bounds)
@@ -1874,7 +1900,7 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
             ) for name, rect in obstacles
         )
         raise RuntimeError(
-            "ESP-12F has no legal lower-half F.Cu placement in any orientation. "
+            "ESP8266EX has no legal lower-half F.Cu placement clear of the antenna in any orientation. "
             + " | ".join(diagnostics)
             + " | Obstacles: " + obstacle_text
         )
@@ -1893,13 +1919,13 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
     esp["width"], esp["height"] = rectangle_dimensions(bounds)
     assign_component_nets(esp, nets, report, audit_errors)
     report.extend([
-        "U1: Ai-Thinker ESP-12F Wi-Fi module on F.Cu, lower-half placement search, orientation {} degrees".format(orientation),
-        "ESP-12F onboard antenna used; no board U.FL connector, coax pigtail or external PCB meander",
-        "ESP-12F onboard SPI flash and crystal used; pads 9-14 are intentional NC flash connections",
-        "Module placement searched in the permitted lower-half region in all four orthogonal orientations and checked against D3, USB-C J1, J2, Geeplus body and bracket holes"
+        "U1: bare Espressif ESP8266EX QFN32 on F.Cu, lower-half placement, orientation {} degrees".format(orientation),
+        "U2 W25Q32 4MB external SPI flash on B.Cu; X1 26MHz crystal and load capacitors fitted",
+        "RF pin 2 feeds DNP pi-network placeholders and the right-edge PCB meander antenna",
+        "QFN placement checked against D3, USB-C J1, J2, Geeplus body, bracket holes and antenna keepout"
     ])
     print(
-        "ESP-12F U1 placed on F.Cu in lower half; orientation:",
+        "Bare ESP8266EX U1 placed on F.Cu in lower half; orientation:",
         orientation, "bounds:",
         tuple(round(to_mm(v), 2) for v in bounds)
     )
@@ -2116,8 +2142,7 @@ def pack_side(
 
     # Only now, with final transformed bounds, generate and test packing plans.
     # First place parts with dedicated nets to the fixed ESP/connector anchors.
-    # The ESP-12F integrates its flash and crystal, so only external GPIO, reset,
-    # battery-sense and power connections remain to be routed.
+    # Bare ESP8266EX uses the external W25Q32 SPI flash and 26 MHz crystal.
     common_rails = {"GND", "3V3", "BAT+", "BAT-", "USB_VBUS"}
     fixed_net_names = set()
     for fixed_item in fixed_items:
@@ -2721,6 +2746,7 @@ def create_gnd_stitching(board, nets, report):
         reference = footprint.GetReference()
         clearance = 4.0 if reference == "U1" else 0.75
         obstacles.append(expand_rectangle(bounds, clearance))
+    obstacles.append(tuple(mm(v) for v in RF_ANTENNA_BOUNDS_MM))
 
     candidates = []
     # A 1 mm search grid gives enough choice to distribute the stitches.
@@ -3542,10 +3568,11 @@ def build_board():
     )
     esp_clearance = place_fixed_esp(
         board, nets, esp_item, report, audit_errors,
-        # Reserve D3 and the USB/solenoid connectors; the ESP-12F uses its
-        # onboard antenna and no separate board-edge RF connector.
         fixed_obstacles=[led, usb_item, solenoid_item],
-        fixed_keepouts=[solenoid_row_band]
+        fixed_keepouts=[
+            solenoid_row_band,
+            tuple(mm(v) for v in RF_ANTENNA_BOUNDS_MM)
+        ]
     )
 
     # Fixed anchors must remain inside the board and outside the solenoid body.
@@ -3559,28 +3586,31 @@ def build_board():
                 )
             )
 
-    # Consolidate every electrical component onto F.Cu. The automatic packer
-    # may use the full board area, excluding fixed anchors and the J2 body lane.
+    # F.Cu components are packed in the lower half. External SPI flash U2
+    # is packed separately on B.Cu after reserving all F.Cu physical envelopes.
     # Reserve the complete mechanical clearance around both L-bracket
     # fixing holes during automatic component packing on BOTH copper sides.
     fixed_anchor_rectangles = [
         led_clearance, usb_clearance, solenoid_clearance, esp_clearance,
-        solenoid_row_band
+        solenoid_row_band,
+        tuple(mm(v) for v in RF_ANTENNA_BOUNDS_MM)
     ] + mounting_hole_keepouts()
     fixed_anchor_items = [led, usb_item, solenoid_item, esp_item]
 
     front_items = [
         item for item in prepared
-        if item["reference"] not in ("U1", "J1", "J2")
+        if item["reference"] not in ("U1", "J1", "J2", "U2")
         and item["side"] == "F"
     ]
-    bottom_items = []
+    bottom_items = [
+        item for item in prepared if item["reference"] == "U2"
+    ]
 
     print("\nSingle-sided front placement plan (full board area):")
     print("  F.Cu passives/components:", ", ".join(
         item["reference"] for item in front_items
     ))
-    print("  B.Cu components: none")
+    print("  B.Cu components:", ", ".join(item["reference"] for item in bottom_items))
 
     front = pack_side(
         board, nets, front_items, "F", report, audit_errors,
@@ -3588,25 +3618,33 @@ def build_board():
         fixed_anchor_items
     )
 
-    back = []
+    # Pack U2 on B.Cu after the front pass, reserving every F.Cu courtyard
+    # so no component overlaps through the board.
+    front_obstacles = [
+        footprint_placement_bounds(item["footprint"]) for item in front
+    ]
+    back = pack_side(
+        board, nets, bottom_items, "B", report, audit_errors,
+        fixed_anchor_rectangles + front_obstacles,
+        fixed_anchor_items + front
+    ) if bottom_items else []
 
-    # Verify every electrical footprint is on F.Cu and inside the board outline.
     for component in [esp_item, usb_item, solenoid_item] + front + [led]:
         if component["footprint"].GetLayer() != pcbnew.F_Cu:
             raise RuntimeError("{} was not placed on F.Cu".format(component["reference"]))
-        bounds = footprint_placement_bounds(component["footprint"])
+    for component in back:
+        if component["footprint"].GetLayer() != pcbnew.B_Cu:
+            raise RuntimeError("{} was not placed on B.Cu".format(component["reference"]))
 
     placed = [esp_item, usb_item, solenoid_item] + front + back
 
-    # Final placement audit before saving.
-    verify_placement(
-        placed,
-        led,
-        solenoid_row_band
-    )
+    # Add the bare chip's right-edge PCB antenna as real RF_ANT copper.
+    create_esp8266_rf_antenna(board, nets, report)
 
-    # ESP-12F has its own module antenna. No external PCB meander or U.FL
-    # connector is generated; this also removes the old oversized RF rule area.
+    # Final placement audit before saving.
+    verify_placement(placed, led, solenoid_row_band)
+
+    # Bare ESP8266EX has an external RF matching network and PCB meander antenna.
 
     # Apply pad geometry and local-clearance changes before zone fill so both
     # copper planes are calculated from the final footprints.
@@ -3664,8 +3702,8 @@ def build_board():
     print("Report:", os.path.abspath(REPORT_FILE))
 
     print("\nComponents:", len(placed)+1)
-    print("Front F.Cu:", len(placed)+1, "(all electrical components)")
-    print("Back B.Cu: 0 electrical components")
+    print("Front F.Cu:", len([x for x in placed if x["footprint"].GetLayer() == pcbnew.F_Cu])+1)
+    print("Back B.Cu:", len(back), "(external SPI flash)")
 
     print("\nBATTERY PROTECTION:")
     print("1. DW01A OD drives FS8205A G1 (pad 4).")
@@ -3680,10 +3718,10 @@ def build_board():
     print("4. USB data pads remain intentionally unconnected.")
 
     print("\nRF MODULE:")
-    print("1. ESP-12F onboard antenna is used; the external U.FL connector and PCB meander are removed.")
-    print("2. Keep the ESP-12F antenna end at the PCB edge and clear of host-board copper/components.")
-    print("3. ESP-12F onboard flash/crystal replace the separate W25Q32 and 26 MHz crystal.")
-    print("4. Verify antenna clearance against the exact ESP-12F datasheet and enclosure.")
+    print("1. U1 is bare ESP8266EX QFN32; U2 is external W25Q32 4MB SPI flash on B.Cu.")
+    print("2. X1 is a 26MHz crystal; C19/C20 are initial 12pF load-capacitor placeholders.")
+    print("3. R26 is the 12k RES12K resistor; R25 pulls CHIP_EN high.")
+    print("4. RF pin 2 feeds the DNP pi-network and right-edge PCB antenna; tune on hardware.")
 
     print("\nNEXT:")
     print("1. Open PCB in KiCad.")
@@ -3696,7 +3734,7 @@ def build_board():
     print("7. No copper pours are present; route all nets with tracks/vias, then run DRC.")
 
     print("\nIMPORTANT ENGINEERING CHECKS:")
-    print("1. Verify exact ESP-12F module footprint pad numbering and the physical 16 x 17 mm module outline.")
+    print("1. Verify ESP8266EX QFN32 pad numbering and W25Q32 flash pinout against the purchased parts.")
     print("2. Verify exact USB-C footprint pad numbering.")
     print("3. Verify switch footprint pad numbering.")
     print("4. Verify WS2812B-V6 footprint pad numbering.")
@@ -3705,7 +3743,7 @@ def build_board():
     print("7. Check solenoid current, MOSFET heating and diode rating.")
     print("8. Confirm capacitor voltage ratings.")
     print("9. Confirm regulator feedback voltages.")
-    print("10. Check antenna tuning with final enclosure fitted.")
+    print("10. Tune the PCB antenna and RF matching network with a VNA and final enclosure fitted.")
     print("11. Run electrical and physical DRC after routing.")
 
     print("\nDSN export is not proof of electrical correctness.")
