@@ -31,12 +31,12 @@
 #   - R3-R9 and R21-R24 are assigned to B.Cu to reduce ESP signal vias.
 #   - A full-width horizontal placement lane around solenoid connector J2 is
 #     reserved so no other component shares its row.
-#   - ESP-12F onboard antenna is used directly; no external U.FL connector or host-board meander.
+#   - Bare ESP8266EX QFN32 with external W25Q32, 26MHz crystal and PCB antenna.
 #   - Placement audit checks component body/courtyard overlap on both PCB sides.
 #   - Two M3 NPTH holes secure the L-bracket base, 28 mm apart vertically.
 #   - Solenoid fixing holes are on the bracket's vertical face, not the PCB.
 #   - No dedicated programming header is fitted; ESP UART pads remain available.
-#   - Ai-Thinker ESP-12F module is placed at the lower-right with its onboard antenna at the board edge.
+#   - Bare ESP8266EX QFN32 is placed lower-right with the PCB antenna at the same right-hand edge.
 #   - USB-C J1 fixed at lower-left, mirrored, receptacle opening facing the left edge.
 #   - FreeRouting width set to 0.20 mm; edge routing margin reserved on both layers.
 #   - Central WS2812B-V6 3.3 V RGB LED position fixed.
@@ -48,16 +48,16 @@
 #
 # Power architecture:
 #   - Single-cell 3.7 V nominal LiPo (4.2 V fully charged) at J3.
-#   - U3 regulates the LiPo to the main 3.3 V ESP-12F/RGB rail.
+#   - U3 regulates the LiPo to the main 3.3 V ESP8266EX/RGB rail.
 #   - U7 independently regulates the LiPo to a 3.0 V rail for the 3 V solenoid.
 #   - U7 feedback divider R17=499k / R18=100k sets approximately 3.0 V
 #     for the TPS63070 0.5 V feedback reference.
 #   - Keep the independent solenoid regulator until coil current and
 #     regulator transient capability are verified; do not assume the
-#     ESP-12F 3V3 rail is isolated from the 3.0 V solenoid pulse rail.
+#     ESP8266EX 3V3 rail is isolated from the 3.0 V solenoid pulse rail.
 #
 # Electrical:
-#   - ESP-12F EN (pad 3) and VCC (pad 8) -> 3V3.
+#   - ESP8266EX CHIP_EN is pulled high; VDD, boot straps, reset and RF pins are assigned.
 #   - D3 WS2812B-V6 powered from 3V3; ESP data connects directly.
 #   - Obsolete 5 V LED boost and AHCT level-shifter stages removed.
 #   - DW01A OD -> FS8205A G1 pad 4.
@@ -170,8 +170,8 @@ PLACEMENT_LOWER_HALF_START = 31.0
 PACKING_ATTEMPTS = 80  # Alternate orders retained as a collision-safe fallback
 RANDOM_SEED = 4217
 
-# ESP-12F uses its onboard antenna. The old U.FL connector, host-board
-# meander and oversized external-antenna rule areas are intentionally removed.
+# Bare ESP8266EX uses external flash, crystal, pi-network placeholders and a
+# right-edge PCB meander antenna.
 
 
 # L-bracket base fixing holes on the PCB, aligned vertically on the left.
@@ -950,7 +950,7 @@ PAD_NETS = {
 
 # Bare ESP8266EX PCB antenna region at the lower/right board edge.
 # Keep this region free of footprints and GND stitching vias.
-RF_ANTENNA_BOUNDS_MM = (49.5, 53.0, 59.0, 61.5)
+RF_ANTENNA_BOUNDS_MM = (49.5, 63.0, 59.0, 71.5)
 
 # ================================================================
 # GEOMETRY
@@ -1333,10 +1333,10 @@ def create_esp8266_rf_antenna(board, nets, report):
     Final antenna length, impedance and matching values require VNA tuning.
     """
     path = [
-        (50.2, 54.0), (58.2, 54.0),
-        (58.2, 56.2), (50.2, 56.2),
-        (50.2, 58.4), (58.2, 58.4),
-        (58.2, 60.6)
+        (50.2, 64.0), (58.2, 64.0),
+        (58.2, 66.2), (50.2, 66.2),
+        (50.2, 68.4), (58.2, 68.4),
+        (58.2, 70.6)
     ]
     for start, end in zip(path[:-1], path[1:]):
         track = pcbnew.PCB_TRACK(board)
@@ -1580,7 +1580,7 @@ def assign_component_nets(
 # ================================================================
 
 def reserved_rectangles(side):
-    # ESP-12F uses its onboard antenna; no separate host-board radiator
+    # Bare ESP8266EX uses a separate PCB antenna radiator
     # reservation is required. Keep only real mechanical-hole reservations.
     return list(mounting_hole_keepouts())
 
@@ -1806,7 +1806,7 @@ def place_by_bounds(item, target_x, target_y):
 
 def place_fixed_esp(board, nets, esp, report, audit_errors,
                     fixed_obstacles=None, fixed_keepouts=None):
-    """Search all four module orientations across the full board area."""
+    """Search lower-half QFN positions clear of the right-edge antenna."""
     esp["side"] = "F"
     footprint = esp["footprint"]
     footprint.SetLayer(pcbnew.F_Cu)
@@ -1826,7 +1826,7 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
     margin = mm(BOARD_MARGIN)
     min_top = mm(PLACEMENT_LOWER_HALF_START + BOARD_MARGIN)
     max_right = mm(PCB_WIDTH) - margin
-    max_bottom = mm(PCB_HEIGHT) - margin
+    max_bottom = mm(PCB_HEIGHT - 8.0)
     best = None
     diagnostics = []
 
@@ -1913,7 +1913,7 @@ def place_fixed_esp(board, nets, esp, report, audit_errors,
     bounds = footprint_placement_bounds(footprint)
 
     if not rectangle_inside_board(bounds) or bounds[1] < min_top:
-        raise RuntimeError("ESP-12F U1 is outside the PCB outline.")
+        raise RuntimeError("ESP8266EX U1 is outside the PCB outline.")
 
     esp["local_bounds"] = bounds
     esp["width"], esp["height"] = rectangle_dimensions(bounds)
@@ -3296,7 +3296,7 @@ def write_report(report, audit_errors):
 
         f.write("\nR19: 470 ohms.\n")
         f.write(
-            "U1 ESP-12F pad 3 EN and pad 8 VCC: connected to 3V3.\n"
+            "U1 ESP8266EX CHIP_EN pin 7 pulled up by R25; RES12K pin 31 is grounded through R26.\n"
         )
         f.write(
             "DW01A OD: connected to FS8205A G1, pad 4.\n"
@@ -3315,16 +3315,16 @@ def write_report(report, audit_errors):
             "Every copper pad must have a PAD_NETS entry; intentional NC entries are documented and left netless.\n"
         )
         f.write(
-            "RF: ESP-12F onboard antenna; no external U.FL, coax or host-board meander.\n"
+            "RF: bare ESP8266EX uses a right-edge PCB antenna and DNP pi-network placeholders.\n"
         )
         f.write(
-            "RF: obsolete external antenna meander and oversized antenna keepout removed.\n"
+            "RF: 30.6 mm initial antenna meander; matching and final geometry require RF tuning.\n"
         )
         f.write(
             "Copper pours: DISABLED; no copper zones are generated.\n"
         )
         f.write(
-            "ESP-12F onboard antenna: follow the module datasheet antenna-edge and copper-clearance layout guidance.\n"
+            "ESP8266EX antenna: tune feed, pi network, board ground clearance and enclosure on hardware.\n"
         )
         f.write(
             "A net assignment is not a copper route.\n"
@@ -3725,7 +3725,7 @@ def build_board():
 
     print("\nNEXT:")
     print("1. Open PCB in KiCad.")
-    print("2. Confirm all electrical components are on F.Cu and in the lower half.")
+    print("2. Confirm U2 flash is on B.Cu and all other support parts are in the lower-half placement region.")
     print("3. Confirm physical solenoid clearance and connector alignment.")
     print("3. Export DSN using a compatible Specctra exporter.")
     print("4. Run RUN_FREEROUTING_ALL_NETS.bat; import the SES result and verify every airwire, including RF.")
