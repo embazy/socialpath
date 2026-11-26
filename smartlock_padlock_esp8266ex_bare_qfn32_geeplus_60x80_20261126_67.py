@@ -3241,7 +3241,9 @@ def write_bom():
 
             footprint_label = resolved_library + ":" + resolved_name
             if ref == "U1":
-                footprint_label += " (ESP-12F 22-pad module footprint)"
+                footprint_label += " (ESP8266EX QFN32 bare chip)"
+            elif ref == "U2":
+                footprint_label += " (W25Q32 4MB external SPI flash)"
             writer.writerow([
                 ref,
                 value,
@@ -3478,7 +3480,7 @@ def build_board():
     print("Components defined:", front_count)
     print("Two M3 NPTH L-bracket base holes are in a vertical column on the left edge")
     print("RF: bare ESP8266EX with external matching placeholders and right-edge PCB antenna")
-    print("Central LED: fixed at board centre")
+    print("Central LED: fixed at original position (23.0, 52.0 mm)")
     print("ESP8266EX: F.Cu QFN32; external W25Q32 flash on B.Cu; 26MHz crystal")
     print("General component clearance: {:.2f} mm per footprint envelope".format(COMPONENT_CLEARANCE))
     print("Placement strategy: lower-half MaxRects packing with separate flash side and RF antenna keepout")
@@ -3725,7 +3727,7 @@ def build_board():
     print("\nRF MODULE:")
     print("1. U1 is bare ESP8266EX QFN32; U2 is external W25Q32 4MB SPI flash on B.Cu.")
     print("2. X1 is a 26MHz crystal; C19/C20 are initial 12pF load-capacitor placeholders.")
-    print("3. R26 is the 12k RES12K resistor; R25 pulls CHIP_EN high.")
+    print("3. R26 is the 12k RES12K resistor; R25 pulls CHIP_EN high; R28-R30 pull flash CS/WP/HOLD high.")
     print("4. RF pin 2 feeds the DNP pi-network and right-edge PCB antenna; tune on hardware.")
 
     print("\nNEXT:")
