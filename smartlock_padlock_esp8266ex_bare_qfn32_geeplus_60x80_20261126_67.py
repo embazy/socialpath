@@ -665,6 +665,9 @@ COMPONENTS = [
     ("R25", "10k ESP CHIP ENABLE", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "10k"),
     ("R26", "12k RES12K", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "12k"),
     ("R27", "0R RF SERIES LINK", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "0R"),
+    ("R28", "10k FLASH CS PULLUP", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "10k"),
+    ("R29", "10k FLASH WP PULLUP", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "10k"),
+    ("R30", "10k FLASH HOLD PULLUP", "Resistor_SMD", "R_0402_1005Metric", 0, "F", "10k"),
     ("X1", "26MHz CRYSTAL", "Crystal", "Crystal_SMD_3225-4Pin_3.2x2.5mm", 0, "F", "26MHz crystal")
 ]
 
@@ -943,6 +946,9 @@ PAD_NETS = {
     "R25": {"1": "3V3", "2": "ESP_EN"},
     "R26": {"1": "ESP_RES12K", "2": "GND"},
     "R27": {"1": "RF_FEED", "2": "RF_ANT"},
+    "R28": {"1": "3V3", "2": "FLASH_CS0"},
+    "R29": {"1": "3V3", "2": "FLASH_WP"},
+    "R30": {"1": "3V3", "2": "FLASH_HOLD"},
     "X1": {"1": "XTAL_IN", "2": "GND", "3": "XTAL_OUT", "4": "GND"}
 }
 
