@@ -175,10 +175,9 @@ RANDOM_SEED = 4217
 
 
 # L-bracket base fixing holes on the PCB, aligned vertically on the left.
-# The original right-side column conflicted with the ESP-12F module mounted at
-# the right edge. Move the pair to the left edge, clear of the lower-left USB-C
-# footprint; the 2.6 mm solenoid fixing holes remain on the bracket's vertical
-# face and are not drilled through the PCB.
+# The left-side mounting-hole column remains clear of the bare ESP8266EX and
+# its lower/right PCB antenna region; the solenoid fixing holes remain on the
+# bracket's vertical face and are not drilled through the PCB.
 MOUNT_HOLES = [
     ("H1", 3.5, 17.0),
     ("H2", 3.5, 45.0),
@@ -3465,24 +3464,24 @@ def build_board():
 
     print("Board:", PCB_WIDTH, "x", PCB_HEIGHT)
     print("Copper layers: 2")
-    print("Assembly: all electrical components on F.Cu across the full board")
+    print("Assembly: ESP8266EX support components on F.Cu; external SPI flash on B.Cu")
     print("Thickness:", PCB_THICKNESS)
     front_count = len(COMPONENTS)
-    print("Component placement: single-sided F.Cu autoplace across full board; solenoid body reserved")
+    print("Component placement: F.Cu/B.Cu lower-half autoplace; solenoid and antenna areas reserved")
     print("Placement: 8 x 10 occupancy-balanced autoplace; no component shares J2's horizontal row")
     print("Components defined:", front_count)
     print("Two M3 NPTH L-bracket base holes are in a vertical column on the left edge")
-    print("RF: ESP-12F onboard antenna; no U.FL connector or external meander")
+    print("RF: bare ESP8266EX with external matching placeholders and right-edge PCB antenna")
     print("Central LED: fixed at board centre")
-    print("ESP-12F: F.Cu fixed anchor; onboard antenna, no external RF parts")
+    print("ESP8266EX: F.Cu QFN32; external W25Q32 flash on B.Cu; 26MHz crystal")
     print("General component clearance: {:.2f} mm per footprint envelope".format(COMPONENT_CLEARANCE))
-    print("Placement strategy: MaxRects free-space packing in the lower half; ESP-12F onboard flash and antenna")
-    print("Single-sided placement: F.Cu only; all electrical components may use full board")
+    print("Placement strategy: lower-half MaxRects packing with separate flash side and RF antenna keepout")
+    print("Placement: F.Cu support components and B.Cu flash, with lower-half boundary retained")
     print("USB-C J1: F.Cu lower-left, receptacle opening facing left")
     print("Solenoid J2: fixed above central LED D3; its solenoid body envelope is reserved")
     print("R19: 470 ohms")
     print("USB-C shell tabs S1-S4 / SH1-SH4 -> GND")
-    print("Components: all electrical footprints on F.Cu, packed across the full PCB")
+    print("Components: bare ESP8266EX, W25Q32 flash, 26MHz crystal and RF network")
     print("GND pads: explicitly assigned by PAD_NETS; both copper layers remain available for routing")
 
     prepared, led = prepare_all_components()
