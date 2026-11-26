@@ -1979,7 +1979,7 @@ def place_fixed_solenoid(
     ))
 
     actual = footprint_placement_bounds(footprint)
-    if not rectangle_inside_board(actual) or actual[1] < mm(PCB_HEIGHT / 2.0):
+    if not rectangle_inside_board(actual) or actual[1] < mm(PLACEMENT_LOWER_HALF_START):
         raise RuntimeError(
             "Solenoid connector J2 does not fit directly above central LED D3 in the lower half. "
             "Measured envelope: {} x {} mm; calculated top-left: ({}, {}). "
